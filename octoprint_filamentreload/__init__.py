@@ -17,7 +17,8 @@ class FilamentReloadedPlugin(octoprint.plugin.StartupPlugin,
         if GPIO.VERSION < "0.6":       # Need at least 0.6 for edge detection
             raise Exception("RPi.GPIO must be greater than 0.6")
         GPIO.setwarnings(False)        # Disable GPIO warnings
-
+        self.filament_ran_out = False
+		
     @property
     def pin(self):
         return int(self._settings.get(["pin"]))
@@ -37,6 +38,10 @@ class FilamentReloadedPlugin(octoprint.plugin.StartupPlugin,
     @property
     def no_filament_gcode(self):
         return str(self._settings.get(["no_filament_gcode"])).splitlines()
+
+    @property
+    def no_filament_resume_gcode(self):
+        return str(self._settings.get(["no_filament_resume_gcode"])).splitlines()
 
     @property
     def pause_print(self):
@@ -67,6 +72,7 @@ class FilamentReloadedPlugin(octoprint.plugin.StartupPlugin,
             switch  = 0,    # Normally Open
             mode    = 0,    # Board Mode
             no_filament_gcode = '',
+            no_filament_resume_gcode = '',
             pause_print = True,
         )
 
@@ -102,6 +108,12 @@ class FilamentReloadedPlugin(octoprint.plugin.StartupPlugin,
                     callback=self.sensor_callback,
                     bouncetime=self.bounce
                 )
+            if event is Events.PRINT_RESUMED:
+                if self.no_filament_resume_gcode and self.filament_ran_out:
+                    self._logger.info("Sending resume filament GCODE")
+                    self._printer.commands(self.no_filament_resume_gcode)
+                    self.filament_ran_out = False
+                
         # Disable sensor
         elif event in (
             Events.PRINT_DONE,
@@ -119,6 +131,7 @@ class FilamentReloadedPlugin(octoprint.plugin.StartupPlugin,
             if self.pause_print:
                 self._logger.info("Pausing print.")
                 self._printer.pause_print()
+                self.filament_ran_out = True
             if self.no_filament_gcode:
                 self._logger.info("Sending out of filament GCODE")
                 self._printer.commands(self.no_filament_gcode)
