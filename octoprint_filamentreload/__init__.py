@@ -88,7 +88,14 @@ class FilamentReloadedPlugin(octoprint.plugin.StartupPlugin,
 
     def get_template_configs(self):
         return [dict(type="settings", custom_bindings=False)]
-
+        
+	@octoprint.plugin.BlueprintPlugin.route("/status", methods=["GET"])
+	def check_status(self):
+		status = "-1"
+		if self.pin != -1:
+			status = "0" if self.no_filament() else "1"
+		return jsonify( status = status )
+        
     def on_event(self, event, payload):
         # Early abort in case of out ot filament when start printing, as we
         # can't change with a cold nozzle
